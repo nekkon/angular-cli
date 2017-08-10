@@ -5,12 +5,13 @@
 const chalk = require('chalk');
 const fs = require('fs');
 const glob = require('glob');
-const packages = require('../../lib/packages');
+const packages = require('../../lib/packages').packages;
 const path = require('path');
 
 
 const IMPORT_RE = /(^|\n)\s*import\b(?:.|\n)*?\'[^\']*\'/g;
 const REQUIRE_RE = /\brequire\('[^)]+?'\)/g;
+const IGNORE_RE = /\s+@ignoreDep\s+\S+/g;
 const NODE_PACKAGES = [
   'child_process',
   'fs',
@@ -26,6 +27,9 @@ const ANGULAR_PACKAGES = [
   '@angular/compiler',
   '@angular/compiler-cli',
   '@angular/core'
+];
+const OPTIONAL_PACKAGES = [
+  '@angular/service-worker'
 ];
 
 
@@ -69,6 +73,16 @@ function listRequiredModules(source) {
     });
 }
 
+function listIgnoredModules(source) {
+  const ignored = source.match(IGNORE_RE);
+  return (ignored || [])
+    .map(match => {
+      const m = match.match(/@ignoreDep\s+(\S+)/);
+      return m && m[1];
+    })
+    .filter(x => !!x);
+}
+
 function reportMissingDependencies(missingDeps) {
   if (missingDeps.length == 0) {
     console.log(chalk.green('  no dependency missing from package.json.'));
@@ -107,6 +121,10 @@ for (const packageName of Object.keys(packages)) {
       .forEach(modulePath => importMap[modulePath] = true);
     listRequiredModules(source)
       .forEach(modulePath => importMap[modulePath] = true);
+    listIgnoredModules(source)
+      .forEach(modulePath => {
+        delete importMap[modulePath];
+      });
   });
 
   const dependencies = Object.keys(importMap)
@@ -118,10 +136,13 @@ for (const packageName of Object.keys(packages)) {
   const packageJson = JSON.parse(fs.readFileSync(packages[packageName].packageJson, 'utf8'));
   const allDeps = []
     .concat(Object.keys(packageJson['dependencies'] || {}))
+    .concat(Object.keys(packageJson['optionalDependencies'] || {}))
     .concat(Object.keys(packageJson['devDependencies'] || {}))
     .concat(Object.keys(packageJson['peerDependencies'] || {}));
 
-  const missingDeps = dependencies.filter(d => allDeps.indexOf(d) == -1);
+  const missingDeps = dependencies
+    .filter(d => allDeps.indexOf(d) == -1)
+    .filter(d => OPTIONAL_PACKAGES.indexOf(d) == -1);
   reportMissingDependencies(missingDeps);
 
   const overDeps = allDeps.filter(d => dependencies.indexOf(d) == -1)
@@ -137,11 +158,13 @@ const rootPackageJson = JSON.parse(fs.readFileSync(rootPackagePath, 'utf8'));
 // devDependencies are ignored
 const allRootDeps = []
     .concat(Object.keys(rootPackageJson['dependencies'] || {}))
+    .concat(Object.keys(rootPackageJson['optionalDependencies'] || {}))
     .concat(Object.keys(rootPackageJson['peerDependencies'] || {}));
 
 const internalPackages = Object.keys(packages);
 const missingRootDeps = overallDeps.filter(d => allRootDeps.indexOf(d) == -1)
-  .filter(d => internalPackages.indexOf(d) == -1);
+  .filter(d => internalPackages.indexOf(d) == -1)
+  .filter(x => OPTIONAL_PACKAGES.indexOf(x) == -1);
 reportMissingDependencies(missingRootDeps);
 
 const overRootDeps = allRootDeps.filter(d => overallDeps.indexOf(d) == -1)

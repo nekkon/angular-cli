@@ -97,7 +97,7 @@ export class Logger extends Observable<LogEntry> {
     return `<Logger(${this.name})>`;
   }
 
-  lift(operator: Operator<LogEntry, LogEntry>): Observable<LogEntry> {
+  lift<R>(operator: Operator<LogEntry, R>): Observable<R> {
     return this._observable.lift(operator);
   }
 
@@ -105,9 +105,9 @@ export class Logger extends Observable<LogEntry> {
   subscribe(observer: PartialObserver<LogEntry>): Subscription;
   subscribe(next?: (value: LogEntry) => void, error?: (error: any) => void,
             complete?: () => void): Subscription;
-  subscribe(observerOrNext?: PartialObserver<LogEntry> | ((value: LogEntry) => void),
-            error?: (error: any) => void,
-            complete?: () => void): Subscription {
+  subscribe(_observerOrNext?: PartialObserver<LogEntry> | ((value: LogEntry) => void),
+            _error?: (error: any) => void,
+            _complete?: () => void): Subscription {
     return this._observable.subscribe.apply(this._observable, arguments);
   }
   forEach(next: (value: LogEntry) => void, PromiseCtor?: typeof Promise): Promise<void> {

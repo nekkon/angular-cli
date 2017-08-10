@@ -3,7 +3,7 @@ import * as glob from 'glob';
 import {getGlobalVariable} from './env';
 import {relative} from 'path';
 import {copyFile} from './fs';
-import {updateJsonFile} from './project';
+import {useBuiltPackages} from './project';
 import {silentNpm} from './process';
 
 
@@ -32,19 +32,11 @@ export function copyAssets(assetName: string) {
 
 
 export function createProjectFromAsset(assetName: string) {
-  const packages = require('../../../lib/packages');
+  const packages = require('../../../lib/packages').packages;
 
   return Promise.resolve()
     .then(() => copyAssets(assetName))
     .then(dir => process.chdir(dir))
-    .then(() => updateJsonFile('package.json', json => {
-      for (const packageName of Object.keys(packages)) {
-        if (json['dependencies'].hasOwnProperty(packageName)) {
-          json['dependencies'][packageName] = packages[packageName].dist;
-        } else if (json['devDependencies'].hasOwnProperty(packageName)) {
-          json['devDependencies'][packageName] = packages[packageName].dist;
-        }
-      }
-    }))
+    .then(() => useBuiltPackages())
     .then(() => silentNpm('install'));
 }
